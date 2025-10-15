@@ -24,11 +24,11 @@ max_lanes =  14
 train_augments = [
      dict(name='Resize', parameters=dict(height=img_h, width=img_w, interpolation=cv2.INTER_CUBIC, p=1.0)),
      dict(name='HorizontalFlip', parameters=dict(p=0.5)),
-     dict(name='RandomBrightnessContrast', parameters=dict(brightness_limit=(-0.15, 0.15), contrast_limit=(-0, 0), p=0.6)),
-     dict(name='HueSaturationValue', parameters=dict(hue_shift_limit=(-10, 10), sat_shift_limit=(-10, 10), val_shift_limit=(-0, 0), p=0.7)),
+     dict(name='RandomBrightnessContrast', parameters=dict(brightness_limit=(-0.2, 0.2), contrast_limit=(-0.1, 0.1), p=0.7)),
+     dict(name='HueSaturationValue', parameters=dict(hue_shift_limit=(-15, 15), sat_shift_limit=(-15, 15), val_shift_limit=(-10, 10), p=0.8)),
      dict(name='OneOf', transforms=[dict(name='MotionBlur', parameters=dict(blur_limit=(3, 5)), p=1.0),
-                                    dict(name='MedianBlur', parameters=dict(blur_limit=(3, 5)), p=1.0)], p=0.2),
-     dict(name='Affine', parameters=dict(translate_percent=dict(x=(-0.1, 0.1), y=(-0.1, 0.1)), rotate=(-9, 9), scale=(0.8, 1.2), interpolation=cv2.INTER_CUBIC, p=0.7)),
+                                    dict(name='MedianBlur', parameters=dict(blur_limit=(3, 5)), p=1.0)], p=0.3),
+     dict(name='Affine', parameters=dict(translate_percent=dict(x=(-0.1, 0.1), y=(-0.1, 0.1)), rotate=(-10, 10), scale=(0.8, 1.2), interpolation=cv2.INTER_CUBIC, p=0.75)),
      dict(name='Resize', parameters=dict(height=img_h, width=img_w, interpolation=cv2.INTER_CUBIC, p=1.0)),
 ]
 
@@ -69,7 +69,7 @@ o2o_rho_thres = 50
 
 ############## train parameter ###############################
 batch_size = 40
-epoch_num = 32
+epoch_num = 36
 random_seed = 3404 #3407 is all you need
 
 ######################optimizer parameter#################################
@@ -91,20 +91,20 @@ ota_iou_width = 8.92
 
 #####loss function #####
 g_weight = 1
-iou_loss_weight = 2
-cls_loss_weight = 0.33
-cls_loss_alpha = 0.45
-cls_loss_alpha_o2o = 0.3
-rank_loss_weight = 0
-end_loss_weight = 0.03
-aux_loss_weight = 0.2
+iou_loss_weight = 2.5
+cls_loss_weight = 0.35
+cls_loss_alpha = 0.42
+cls_loss_alpha_o2o = 0.25
+rank_loss_weight = 0.1
+end_loss_weight = 0.04
+aux_loss_weight = 0.25
 polarmap_loss_weight = 5
 loss_iou_width = 8.92
 
 ######################postprocess parameter######################################
 nms_thres = 50
-conf_thres = 0.45
-conf_thres_o2o = conf_thres
-conf_thres_nmsfree = 0.44
+conf_thres = 0.40
+conf_thres_o2o = 0.40
+conf_thres_nmsfree = 0.38
 is_nmsfree = True
 # is_nmsfree = False
