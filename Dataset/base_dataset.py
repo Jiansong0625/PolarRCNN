@@ -47,7 +47,7 @@ class BaseTrSet(Dataset):
     
     def __getitem__(self, index):
         img, lanes = self.get_sample(index)
-        img, lanes = self.augment(img, lanes)
+        img, lanes, transformed_center = self.augment(img, lanes)
         lanes = self.extend_lane2boundary(lanes)
         num_lanes = len(lanes)
         plot_img = img
@@ -67,12 +67,13 @@ class BaseTrSet(Dataset):
         
 
         if num_lanes>0:
-            lanes_car = [self.coord_trans.img2cartesian(lane) for lane in lanes]
-            _, lane_point_xs, lane_point_validmask, end_points, lane_dense_sample_car = self.fit_lane(lanes_car, is_sample=True)
+            # Use transformed center for coordinate transformation
+            lanes_car = [self.img2cartesian_with_center(lane, transformed_center) for lane in lanes]
+            _, lane_point_xs, lane_point_validmask, end_points, lane_dense_sample_car = self.fit_lane(lanes_car, transformed_center, is_sample=True)
             line_paras, _ = self.curve2line_group(lane_point_xs, lane_point_validmask, 1)
             line_paras = np.squeeze(line_paras, axis=1)
             line_paras_group, group_valid_masks = self.curve2line_group(lane_point_xs, lane_point_validmask, self.num_line_groups)
-            polar_map = self.get_polar_map(lane_dense_sample_car)
+            polar_map = self.get_polar_map(lane_dense_sample_car, transformed_center)
 
             line_paras_pad[:num_lanes] = line_paras
             line_paras_group_pad[:num_lanes] = line_paras_group
@@ -101,11 +102,18 @@ class BaseTrSet(Dataset):
         data_dict['lane_point_validmask'] = lane_point_validmask_pad
 
         return data_dict
+    
+    def img2cartesian_with_center(self, points, center):
+        """Convert image coordinates to cartesian using transformed center point"""
+        points_new = np.zeros_like(points)
+        points_new[..., 0] = points[..., 0] - center[0]
+        points_new[..., 1] = center[1] - points[..., 1]
+        return points_new
 
     def get_lane_endpoints(self, fit_paras):
         return fit_paras[:, (1, 0), 1]-self.center_h+self.img_h
 
-    def get_polar_map(self, xy_car):
+    def get_polar_map(self, xy_car, transformed_center):
         rho_thres = self.img_w/self.polar_map_size[1]/2
         xy_car_diff = -np.diff(xy_car, axis=1)
         angle = np.arctan2(xy_car_diff[..., 1], xy_car_diff[..., 0])/math.pi-0.5
@@ -113,7 +121,8 @@ class BaseTrSet(Dataset):
         angle, xy_car = angle.reshape(-1), xy_car.reshape(-1, 2)
         grid_x, grid_y = np.meshgrid(np.arange(0.5, self.polar_map_size[1], 1, dtype=np.float32), np.arange(0.5, self.polar_map_size[0], 1, dtype = np.float32))
         grid_x, grid_y = grid_x.flatten()/self.polar_map_size[1]*self.img_w, grid_y.flatten()/self.polar_map_size[0]*self.img_h
-        grid_car = self.coord_trans.img2cartesian(np.stack((grid_x, grid_y), axis=-1))
+        # Use transformed center for coordinate transformation
+        grid_car = self.img2cartesian_with_center(np.stack((grid_x, grid_y), axis=-1), transformed_center)
 
         min_ind = np.argmin(np.linalg.norm(grid_car[:, np.newaxis, :] - xy_car[np.newaxis, ...], axis=-1), axis=-1)
 
@@ -134,11 +143,22 @@ class BaseTrSet(Dataset):
 
     
     def augment(self, img, lanes):
+        # Add center point as a keypoint to track its transformation
+        center_point = np.array([[self.center_w, self.center_h]], dtype=np.float32)
+        
         if len(lanes)>0:
             lane_lengths = [len(lane) for lane in lanes]
             keypoints = np.concatenate(lanes, axis=0)
+            # Append center point to keypoints
+            keypoints = np.concatenate([keypoints, center_point], axis=0)
             content = self.train_augments(image=img, keypoints=keypoints)
             keypoints = np.array(content['keypoints'])
+            
+            # Extract transformed center point (it's the last keypoint)
+            transformed_center = keypoints[-1]
+            # Remove center point from keypoints
+            keypoints = keypoints[:-1]
+            
             start_dim = 0
             lanes = []
             for lane_length in lane_lengths:
@@ -146,7 +166,10 @@ class BaseTrSet(Dataset):
                 lanes.append(lane)
                 start_dim += lane_length
         else:
-            content = self.train_augments(image=img)
+            # Even with no lanes, we need to track center point transformation
+            content = self.train_augments(image=img, keypoints=center_point)
+            transformed_center = np.array(content['keypoints'])[0]
+            
         img = content['image']
         clip_lanes = []
         img_shape = (img.shape[0], img.shape[1])
@@ -155,7 +178,7 @@ class BaseTrSet(Dataset):
             if lane is not None:
                 clip_lanes.append(lane)
         lanes = clip_lanes
-        return img, lanes
+        return img, lanes, transformed_center
     
     def extend_lane2boundary(self, lanes):
         bound_h, bound_w = self.img_h-1, self.img_w-1
@@ -184,12 +207,16 @@ class BaseTrSet(Dataset):
                     extend_lanes.append(np.vstack((lane, end_point)))
         return extend_lanes
 
-    def fit_lane(self, lanes, is_sample=False):
+    def fit_lane(self, lanes, transformed_center, is_sample=False):
         curves = []
         lane_point_xs_list = []
         lane_point_validmask_list = []
         end_points_list = []
         lane_dense_sample_list = []
+        
+        # Use transformed center for y sampling
+        sample_y_car = transformed_center[1] - np.linspace(0, 1-1e-5, num = self.num_offsets)*self.img_h
+        sample_y_car_reverse = sample_y_car[::-1]
 
         for lane in lanes:
             lane = lane[np.unique(lane[:, 1], return_index=True)[1]]
@@ -199,8 +226,8 @@ class BaseTrSet(Dataset):
             y_start, y_end = y[0], y[-1]
             spline = interp(y, x, k=1)
             
-            x_fit = spline(self.sample_y_car_reverse)
-            lane_point_validmask = (y_start<self.sample_y_car_reverse)&(self.sample_y_car_reverse<y_end)
+            x_fit = spline(sample_y_car_reverse)
+            lane_point_validmask = (y_start<sample_y_car_reverse)&(sample_y_car_reverse<y_end)
 
             y_dense_sample = np.linspace(y_end, y_start, 101)
             x_dense_sample = spline(y_dense_sample)
@@ -214,7 +241,7 @@ class BaseTrSet(Dataset):
 
         lane_point_xs = np.stack(lane_point_xs_list, axis=0)
         lane_point_validmask = np.stack(lane_point_validmask_list, axis=0)
-        end_points = np.array(end_points_list, dtype=np.float32)-self.center_h + self.img_h
+        end_points = np.array(end_points_list, dtype=np.float32) - transformed_center[1] + self.img_h
         lane_dense_sample = np.stack(lane_dense_sample_list, axis=0)
         return curves, lane_point_xs, lane_point_validmask, end_points, lane_dense_sample
             
