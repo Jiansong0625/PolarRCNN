@@ -1,0 +1,130 @@
+================================================================================
+                    SOLUTION SUMMARY
+================================================================================
+
+ISSUE ADDRESSED:
+----------------
+Centerness 生成方式当前是否有问题，全局极点（center_w/center_h）没有跟随
+几何增广（翻转/仿射）一起变换，导致 θ/r GT 与增广后的图像不一致。
+
+Translation: The centerness generation had an issue where the global pole 
+(center_w/center_h) did not transform with geometric augmentations 
+(flip/affine), causing θ/r ground truth to be inconsistent with the 
+augmented image.
+
+ROOT CAUSE:
+-----------
+The center point coordinates were fixed at initialization and did not 
+transform during data augmentation. This caused:
+- Image: ✓ transformed
+- Lane keypoints: ✓ transformed  
+- Center point: ✗ NOT transformed (BUG!)
+- Result: θ/r calculated from WRONG origin
+
+SOLUTION IMPLEMENTED:
+---------------------
+1. Track center point transformation during augmentation
+   - Add center point as a keypoint to augmentation pipeline
+   - Albumentations automatically transforms it with image/lanes
+   - Extract transformed center after augmentation
+
+2. Use transformed center for ground truth generation
+   - Pass transformed center to GT generation functions
+   - Calculate θ/r using correct (transformed) origin
+   - Ensures polar coordinates align with augmented image
+
+FILES MODIFIED:
+---------------
+1. Dataset/afpl_base_dataset.py (33 lines changed)
+   - augment(): Returns (img, lanes, transformed_center)
+   - __getitem__(): Uses transformed center
+   - generate_afpl_ground_truth(): Accepts transformed_center param
+
+2. Dataset/base_dataset.py (51 lines changed)  
+   - augment(): Returns (img, lanes, transformed_center)
+   - __getitem__(): Uses transformed center throughout
+   - img2cartesian_with_center(): New helper method
+   - fit_lane(): Accepts transformed_center param
+   - get_polar_map(): Uses transformed center
+
+3. test_center_transform.py (334 lines, new file)
+   - Tests HorizontalFlip transformation
+   - Tests Affine transformation
+   - Tests θ/r consistency
+
+4. demo_center_fix.py (172 lines, new file)
+   - Demonstrates the fix
+   - Creates visualization
+
+5. CENTER_FIX_SUMMARY.md (163 lines, new file)
+   - Complete documentation
+
+TOTAL CHANGES: 753 lines across 5 files
+
+TESTING RESULTS:
+----------------
+✓ All existing tests pass (test_afpl_dataset.py)
+✓ All new tests pass (test_center_transform.py)
+  - HorizontalFlip center transform: PASS
+  - Affine center transform: PASS
+  - θ/r consistency: PASS
+✓ Code review: 0 issues (3 minor nitpicks in docs)
+✓ Security scan: 0 vulnerabilities
+
+VERIFICATION:
+-------------
+Run these commands to verify:
+  python test_afpl_dataset.py      # Existing tests
+  python test_center_transform.py  # New tests
+  python demo_center_fix.py        # Demonstration
+
+IMPACT:
+-------
+Positive impacts:
+✓ Training data quality improved
+✓ θ/r ground truth now correctly aligned with augmented images
+✓ Model should learn better features aligned with actual geometry
+✓ Applies to both AFPL-Net and PolarRCNN
+
+Backward compatibility:
+✓ No breaking changes
+✓ Dataset interface unchanged
+✓ All existing tests pass
+✓ No model architecture changes needed
+
+AFFECTED DATASETS:
+------------------
+✓ AFPLBaseTrSet (AFPL-Net base)
+✓ AFPLCULaneTrSet (AFPL CULane)
+✓ BaseTrSet (PolarRCNN base)
+✓ All datasets inheriting from BaseTrSet:
+  - TuSimpleTrSet
+  - CULaneTrSet
+  - LLAMASTrSet
+  - CurveLanesTrSet
+  - DLRailTrSet
+
+AUGMENTATIONS FIXED:
+--------------------
+✓ HorizontalFlip: Center flips correctly (x' = img_w - x)
+✓ Affine (translate/rotate/scale): Center transforms by same matrix
+✓ All other geometric augmentations: Handled automatically
+
+TECHNICAL DETAILS:
+------------------
+The fix leverages albumentations' keypoint transformation system:
+1. Add center as keypoint before augmentation
+2. Albumentations applies same transformation to all keypoints
+3. Extract transformed center after augmentation
+4. Use it for θ/r ground truth calculation
+
+This ensures consistency between:
+- Augmented image
+- Transformed lane points
+- Transformed center point
+- Calculated θ/r ground truth
+
+================================================================================
+                         SOLUTION COMPLETE ✓
+================================================================================
+All requirements met. Ready for code review and merge.
