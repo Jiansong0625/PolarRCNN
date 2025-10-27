@@ -2,6 +2,16 @@
 
 # Polar R-CNN: A New Simple Baseline for 2D Lane Detection
 
+## 🚀 NEW: AFPL-Net Implementation
+
+**AFPL-Net (Anchor-Free Polar Lane Network)** is now available! This single-stage, anchor-free lane detection model combines ideas from PolarMask and Polar R-CNN. See [AFPLNET.md](AFPLNET.md) for details.
+
+Key features:
+- ✅ Single-stage architecture (no RPN needed)
+- ✅ Anchor-free (no need for 20 predefined anchors)
+- ✅ NMS-free post-processing (angular clustering)
+- ✅ Per-pixel polar coordinate prediction
+
 </div>
 
 
@@ -51,6 +61,23 @@ Features:
 
 ## Get started
 For the preparation of datasets and environments, as well as detailed commands, please refer to [INSTALL.md](./INSTALL.md).
+
+### Using AFPL-Net
+
+AFPL-Net provides a simpler, anchor-free alternative to Polar R-CNN:
+
+```bash
+# Training
+python train.py --cfg Config/afplnet_culane_r18.py --save_path work_dir/afplnet
+
+# Testing
+python test.py --cfg Config/afplnet_culane_r18.py --weight_path work_dir/afplnet/best.pth
+
+# Demo inference
+python demo_afplnet.py --cfg Config/afplnet_culane_r18.py --weight path/to/weights.pth --img path/to/image.jpg
+```
+
+See [AFPLNET.md](AFPLNET.md) for comprehensive documentation.
 
 
 ## Trained Weights
