@@ -54,14 +54,14 @@ class AFPLBaseTrSet(Dataset):
     
     def __getitem__(self, index):
         img, lanes = self.get_sample(index)
-        img, lanes = self.augment(img, lanes)
+        img, lanes, transformed_center = self.augment(img, lanes)
         
         # Convert image to tensor
         data_dict = dict()
         data_dict['img'] = self.transforms(img)
         
-        # Generate AFPL-Net ground truth
-        cls_gt, centerness_gt, theta_gt, r_gt = self.generate_afpl_ground_truth(lanes)
+        # Generate AFPL-Net ground truth using the transformed center point
+        cls_gt, centerness_gt, theta_gt, r_gt = self.generate_afpl_ground_truth(lanes, transformed_center)
         
         data_dict['cls_gt'] = cls_gt
         data_dict['centerness_gt'] = centerness_gt
@@ -70,12 +70,13 @@ class AFPLBaseTrSet(Dataset):
         
         return data_dict
     
-    def generate_afpl_ground_truth(self, lanes):
+    def generate_afpl_ground_truth(self, lanes, transformed_center):
         """
         Generate ground truth for AFPL-Net from lane annotations
         
         Args:
             lanes: List of lane arrays, each with shape [N, 2] (x, y coordinates)
+            transformed_center: The center point after augmentation [x, y]
             
         Returns:
             cls_gt: Binary lane mask [feat_h, feat_w]
@@ -90,9 +91,9 @@ class AFPLBaseTrSet(Dataset):
         r_gt = np.zeros((self.feat_h, self.feat_w), dtype=np.float32)
         
         # Precompute polar coordinates for all pixels at feature map resolution
-        # Note: center coordinates are in image space, need to scale to feature map space
-        center_h_feat = self.center_h / self.downsample_factor
-        center_w_feat = self.center_w / self.downsample_factor
+        # Note: Use transformed center coordinates (already in image space), scale to feature map space
+        center_w_feat = transformed_center[0] / self.downsample_factor
+        center_h_feat = transformed_center[1] / self.downsample_factor
         
         y_coords, x_coords = np.meshgrid(
             np.arange(self.feat_h, dtype=np.float32),
@@ -151,11 +152,22 @@ class AFPLBaseTrSet(Dataset):
     
     def augment(self, img, lanes):
         """Apply data augmentation"""
+        # Add center point as a keypoint to track its transformation
+        center_point = np.array([[self.center_w, self.center_h]], dtype=np.float32)
+        
         if len(lanes) > 0:
             lane_lengths = [len(lane) for lane in lanes]
             keypoints = np.concatenate(lanes, axis=0)
+            # Append center point to keypoints
+            keypoints = np.concatenate([keypoints, center_point], axis=0)
             content = self.train_augments(image=img, keypoints=keypoints)
             keypoints = np.array(content['keypoints'])
+            
+            # Extract transformed center point (it's the last keypoint)
+            transformed_center = keypoints[-1]
+            # Remove center point from keypoints
+            keypoints = keypoints[:-1]
+            
             start_dim = 0
             lanes = []
             for lane_length in lane_lengths:
@@ -163,7 +175,9 @@ class AFPLBaseTrSet(Dataset):
                 lanes.append(lane)
                 start_dim += lane_length
         else:
-            content = self.train_augments(image=img)
+            # Even with no lanes, we need to track center point transformation
+            content = self.train_augments(image=img, keypoints=center_point)
+            transformed_center = np.array(content['keypoints'])[0]
         
         img = content['image']
         
@@ -176,7 +190,8 @@ class AFPLBaseTrSet(Dataset):
                 clip_lanes.append(lane)
         lanes = clip_lanes
         
-        return img, lanes
+        # Return augmented image, lanes, and transformed center point
+        return img, lanes, transformed_center
     
     def collate_fn(self, data_dict_list):
         """Collate batch of samples"""
