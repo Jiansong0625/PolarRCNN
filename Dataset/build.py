@@ -6,10 +6,17 @@ def build_trainset(cfg):
     transform = transforms.Compose([
         transforms.ToTensor(),
     ])
+    
+    # Check if using AFPL-Net (single-stage, anchor-free)
+    is_afpl = hasattr(cfg, 'cfg_name') and 'afplnet' in cfg.cfg_name.lower()
 
     if cfg.dataset == 'culane':
-        from .culane_dataset import CULaneTrSet
-        trainset = CULaneTrSet(cfg=cfg, transforms=transform)
+        if is_afpl:
+            from .afpl_culane_dataset import AFPLCULaneTrSet
+            trainset = AFPLCULaneTrSet(cfg=cfg, transforms=transform)
+        else:
+            from .culane_dataset import CULaneTrSet
+            trainset = CULaneTrSet(cfg=cfg, transforms=transform)
 
     elif cfg.dataset == 'llamas':
         from .llamas_dataset import LLAMASTrSet
@@ -37,10 +44,17 @@ def build_testset(cfg):
         Resize(cfg.img_h, cfg.img_w),
         transforms.ToTensor(),
     ])
+    
+    # Check if using AFPL-Net (single-stage, anchor-free)
+    is_afpl = hasattr(cfg, 'cfg_name') and 'afplnet' in cfg.cfg_name.lower()
 
     if cfg.dataset == 'culane':
-        from .culane_dataset import CULaneTsSet
-        testset = CULaneTsSet(cfg=cfg, transforms=pre_transforms)
+        if is_afpl:
+            from .afpl_culane_dataset import AFPLCULaneTsSet
+            testset = AFPLCULaneTsSet(cfg=cfg, transforms=pre_transforms)
+        else:
+            from .culane_dataset import CULaneTsSet
+            testset = CULaneTsSet(cfg=cfg, transforms=pre_transforms)
 
     elif cfg.dataset == 'llamas':
         from .llamas_dataset import LLAMASTsSet
