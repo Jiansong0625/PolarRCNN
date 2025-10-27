@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Model weights and checkpoints
+*.pth
+*.ckpt
+work_dir/
+
+# Dataset
+dataset/
+data/
+
+# Results
+result/
+view/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
