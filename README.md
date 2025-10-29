@@ -70,14 +70,14 @@ AFPL-Net provides a simpler, anchor-free alternative to Polar R-CNN:
 # Training
 python train.py --cfg Config/afplnet_culane_r18.py --save_path work_dir/afplnet
 
-# Testing
-python test.py --cfg Config/afplnet_culane_r18.py --weight_path work_dir/afplnet/best.pth
+# Testing (dedicated AFPL-Net inference script)
+python test_afplnet_inference.py --cfg Config/afplnet_culane_r18.py --weight_path work_dir/afplnet/best.pth
 
-# Demo inference
+# Demo inference on single image
 python demo_afplnet.py --cfg Config/afplnet_culane_r18.py --weight path/to/weights.pth --img path/to/image.jpg
 ```
 
-See [AFPLNET.md](AFPLNET.md) for comprehensive documentation.
+See [AFPLNET.md](AFPLNET.md) for comprehensive documentation and [AFPL_INFERENCE_TEST.md](AFPL_INFERENCE_TEST.md) for detailed inference testing guide.
 
 
 ## Trained Weights
