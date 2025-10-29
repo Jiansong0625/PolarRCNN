@@ -113,9 +113,12 @@ Both scripts share these arguments:
 **Symptom**: Error or incorrect output format
 
 **Solution**: 
-- Check your config file name
-- If it contains 'afplnet', use `test_afplnet_inference.py`
+- Check your config file name - if it contains 'afplnet', use `test_afplnet_inference.py`
 - Otherwise, use `test.py`
+- You can also check the config content:
+  - AFPL-Net configs have `cfg_name` containing 'afplnet'
+  - Polar R-CNN configs have `cfg_name` containing 'polarrcnn'
+- The script will warn you if you use the wrong one
 
 ### Script Detection Warning
 
