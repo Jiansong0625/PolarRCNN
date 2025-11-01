@@ -90,6 +90,27 @@ centerness_loss_weight = 1.0  # Weight for centerness BCE loss
 regression_loss_weight = 2.0  # Weight for polar regression (Smooth L1)
 regression_beta = 1.0  # Beta parameter for Smooth L1 loss
 
+###################### Enhanced loss parameters ############################
+# New optimization features inspired by polar-based methods (PolarMask, FCOS)
+
+# Quality Focal Loss: integrates centerness/quality into classification
+# Produces better quality estimates and suppresses low-quality predictions
+use_quality_focal = True  # Use Quality Focal Loss instead of standard Focal Loss
+
+# Polar IoU Loss: better geometric understanding of (θ, r) predictions
+# Directly optimizes overlap in polar space
+use_polar_iou = True  # Enable Polar IoU loss
+polar_iou_weight = 0.5  # Weight for Polar IoU loss
+polar_iou_type = 'iou'  # 'iou' or 'giou' (Generalized IoU)
+
+# Uncertainty weighting: automatic balancing of theta vs radius losses
+# Learns task-specific weights based on prediction uncertainty
+use_uncertainty = False  # Enable uncertainty-based weighting (experimental)
+
+# Gradient normalization: prevents any single loss from dominating
+# Normalizes losses by their running means for balanced training
+use_grad_norm = True  # Enable gradient normalization
+
 ######################postprocess parameter######################################
 # No NMS needed! Angular clustering handles instance separation
 is_nmsfree = True  # AFPL-Net is always NMS-free
